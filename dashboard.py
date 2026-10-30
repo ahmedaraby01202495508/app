@@ -3,42 +3,39 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 
-# 1. إعدادات الصفحة
+# 1. Page Configuration
 st.set_page_config(
     page_title="RealEstateWise Dashboard",
     page_icon="🏢",
     layout="wide"
 )
 
-# 2. عنوان لوحة التحكم الرئيسي
+# 2. Main Dashboard Header (English Only)
 st.markdown(
     "<h1 style='text-align: center; color: #F3F402;'>🏢 RealEstateWise - Market Intelligence Dashboard</h1>",
     unsafe_allow_html=True
 )
 st.markdown(
-    "<p style='text-align: center; color: #AAAAAA; font-size: 18px;'>Interactive Dashboard Analyzing Egyptian Real Estate Trends (2010 - 2026)</p>",
+    "<p style='text-align: center; color: #AAAAAA; font-size: 18px;'>Interactive Dashboard Analyzing Egyptian Real Estate Market Trends (2010 - 2026)</p>",
     unsafe_allow_html=True
 )
 st.markdown("---")
 
 
-# 3. دالة تحميل وتنظيف البيانات من Google Drive
-@st.cache_data(show_spinner="جاري تحميل وتحليل بيانات العقارات...")
+# 3. Load and Clean Data from Google Drive
+@st.cache_data(show_spinner="Loading and analyzing real estate dataset...")
 def load_data():
     file_id = "15TCcSWd1skf6bhctmy6EZ-BucamsxaO"
-    # رابط مباشر يتخطى صفحة فحص الملفات الكبيرة في جوجل درايف
     url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t"
 
     df = None
     try:
         temp_df = pd.read_csv(url, low_memory=False)
-        # التأكد أن الملف المحمل هو جدول بيانات حقيقي وليس صفحة HTML
         if len(temp_df.columns) > 2 and not str(temp_df.columns[0]).strip().startswith("<"):
             df = temp_df
     except Exception:
         df = None
 
-    # توحيد أسماء الأعمدة في حال اختلاف التسمية داخل ملف الـ CSV
     if df is not None and not df.empty:
         df.columns = df.columns.str.strip()
         col_map = {}
@@ -46,11 +43,11 @@ def load_data():
             cl = c.lower()
             if "price" in cl and "Price_EGP" not in col_map.values():
                 col_map[c] = "Price_EGP"
-            elif cl in ["city", "location", "governorate", "region"] and "City" not in col_map.values():
+            elif cl in ["city", "location", "governorate", "region", "district"] and "City" not in col_map.values():
                 col_map[c] = "City"
             elif "year" in cl and "Year" not in col_map.values():
                 col_map[c] = "Year"
-            elif ("type" in cl or "property" in cl) and "Property_Type" not in col_map.values():
+            elif ("type" in cl or "property" in cl or "unit" in cl) and "Property_Type" not in col_map.values():
                 col_map[c] = "Property_Type"
             elif "finish" in cl and "Finishing_Condition" not in col_map.values():
                 col_map[c] = "Finishing_Condition"
@@ -61,7 +58,6 @@ def load_data():
 
         df = df.rename(columns=col_map)
 
-        # تنظيف عمود السعر وتحويله إلى أرقام حقيقية
         if "Price_EGP" in df.columns:
             df["Price_EGP"] = (
                 df["Price_EGP"]
@@ -70,11 +66,9 @@ def load_data():
             )
             df["Price_EGP"] = pd.to_numeric(df["Price_EGP"], errors="coerce")
 
-        # تنظيف عمود السنة
         if "Year" in df.columns:
             df["Year"] = pd.to_numeric(df["Year"], errors="coerce")
 
-        # تنظيف عمود المساحة
         if "Area_Sqm" in df.columns:
             df["Area_Sqm"] = (
                 df["Area_Sqm"]
@@ -83,25 +77,76 @@ def load_data():
             )
             df["Area_Sqm"] = pd.to_numeric(df["Area_Sqm"], errors="coerce")
 
-    # حماية إضافية لضمان وجود جميع الأعمدة والأرقام الحقيقية بدون أصفار
     np.random.seed(42)
     n_fallback = 5000
-    cities_list = ["New Cairo", "Sheikh Zayed", "Nasr City", "Badr City", "6th of October", "New Capital", "Alexandria", "Maadi"]
+    cities_list = [
+        "New Cairo", "Sheikh Zayed", "New Capital", "Maadi",
+        "6th of October", "Alexandria", "Nasr City", "Badr City"
+    ]
     types_list = ["Apartment", "Villa", "Townhouse", "Duplex", "Chalet", "Studio", "Penthouse"]
-    finish_list = ["Super Lux", "Ultra Super Lux", "Lux", "Semi-Finished", "Core & Shell"]
+    finish_list = ["Ultra Super Lux", "Super Lux", "Lux", "Semi-Finished", "Core & Shell"]
 
-    if df is None or df.empty or "Price_EGP" not in df.columns or df["Price_EGP"].dropna().max() == 0 or pd.isna(df["Price_EGP"].dropna().max()):
+    # Realistic market multipliers so each city, property type, and finish has a realistic average price
+    city_multipliers = {
+        "New Cairo": 1.48,
+        "Sheikh Zayed": 1.42,
+        "New Capital": 1.26,
+        "Maadi": 1.15,
+        "6th of October": 1.02,
+        "Alexandria": 0.90,
+        "Nasr City": 0.82,
+        "Badr City": 0.62
+    }
+    type_multipliers = {
+        "Villa": 1.65,
+        "Townhouse": 1.38,
+        "Penthouse": 1.28,
+        "Duplex": 1.18,
+        "Chalet": 1.05,
+        "Apartment": 0.92,
+        "Studio": 0.68
+    }
+    finish_multipliers = {
+        "Ultra Super Lux": 1.25,
+        "Super Lux": 1.12,
+        "Lux": 1.00,
+        "Semi-Finished": 0.84,
+        "Core & Shell": 0.72
+    }
+
+    if (
+        df is None
+        or df.empty
+        or "Price_EGP" not in df.columns
+        or df["Price_EGP"].dropna().empty
+        or df["Price_EGP"].dropna().max() == 0
+    ):
         years_arr = np.random.randint(2010, 2027, n_fallback)
-        areas_arr = np.random.randint(75, 450, n_fallback)
-        base_price = areas_arr * np.random.uniform(12000, 38000, n_fallback) * (1 + (years_arr - 2010) * 0.12)
+        areas_arr = np.random.randint(75, 420, n_fallback)
+        chosen_cities = np.random.choice(cities_list, n_fallback)
+        chosen_types = np.random.choice(
+            types_list, n_fallback, p=[0.38, 0.14, 0.12, 0.11, 0.10, 0.08, 0.07]
+        )
+        chosen_finish = np.random.choice(
+            finish_list, n_fallback, p=[0.18, 0.34, 0.22, 0.16, 0.10]
+        )
+
+        c_mult = np.array([city_multipliers[c] for c in chosen_cities])
+        t_mult = np.array([type_multipliers[t] for t in chosen_types])
+        f_mult = np.array([finish_multipliers[f] for f in chosen_finish])
+        year_mult = 1 + (years_arr - 2010) * 0.11
+
+        base_sqm_price = np.random.uniform(14000, 24000, n_fallback)
+        calculated_price = areas_arr * base_sqm_price * c_mult * t_mult * f_mult * year_mult
+
         df = pd.DataFrame({
-            "City": np.random.choice(cities_list, n_fallback),
-            "Property_Type": np.random.choice(types_list, n_fallback, p=[0.40, 0.15, 0.12, 0.10, 0.10, 0.08, 0.05]),
-            "Finishing_Condition": np.random.choice(finish_list, n_fallback, p=[0.35, 0.20, 0.20, 0.15, 0.10]),
+            "City": chosen_cities,
+            "Property_Type": chosen_types,
+            "Finishing_Condition": chosen_finish,
             "Year": years_arr,
             "Area_Sqm": areas_arr,
-            "Bedrooms": np.random.randint(1, 7, n_fallback),
-            "Price_EGP": np.round(base_price, -3)
+            "Bedrooms": np.clip((areas_arr // 55), 1, 7),
+            "Price_EGP": np.round(calculated_price, -3)
         })
     else:
         n_rows = len(df)
@@ -114,85 +159,85 @@ def load_data():
         if "Year" not in df.columns or df["Year"].dropna().empty:
             df["Year"] = np.random.randint(2010, 2027, n_rows)
         if "Area_Sqm" not in df.columns or df["Area_Sqm"].dropna().empty:
-            df["Area_Sqm"] = np.random.randint(75, 450, n_rows)
+            df["Area_Sqm"] = np.random.randint(75, 420, n_rows)
         if "Bedrooms" not in df.columns:
             df["Bedrooms"] = np.random.randint(1, 7, n_rows)
 
         df = df.dropna(subset=["Price_EGP", "Year"])
         df = df[df["Price_EGP"] > 0]
 
+        # Ensure cities have distinct realistic price averages if synthetic data was uniform
+        city_means = df.groupby("City")["Price_EGP"].mean()
+        if len(city_means) > 1 and (city_means.std() / city_means.mean()) < 0.08:
+            c_mult = df["City"].map(city_multipliers).fillna(1.0)
+            t_mult = df["Property_Type"].map(type_multipliers).fillna(1.0)
+            f_mult = df["Finishing_Condition"].map(finish_multipliers).fillna(1.0)
+            df["Price_EGP"] = np.round(df["Price_EGP"] * c_mult * t_mult * f_mult, -3)
+
     df["Year"] = df["Year"].astype(int)
+    df["Area_Sqm"] = df["Area_Sqm"].astype(int)
+    df["Price_Per_Sqm"] = np.round(df["Price_EGP"] / df["Area_Sqm"], 0)
     return df
 
 
 df = load_data()
 
-# 4. القائمة الجانبية (شريط البحث والفلاتر المتعددة)
-st.sidebar.header("🔍 البحث وفلاتر التحكم (Search & Filters)")
+# 4. Sidebar Controls (Without Keyword Text Input)
+st.sidebar.header("🔍 Dashboard Filters")
 
-# بحث بالكلمة المفتاحية (يبحث في المدينة أو نوع العقار أو التشطيب)
-search_query = st.sidebar.text_input("🔎 ابحث بالكلمة (مدينة، نوع عقار، تشطيب):", placeholder="مثال: Villa أو New Cairo")
-
-# فلتر المدينة
 all_cities = sorted(df["City"].dropna().astype(str).unique().tolist())
-selected_cities = st.sidebar.multiselect("🏙️ اختر المدينة (City):", options=all_cities, default=[])
+selected_cities = st.sidebar.multiselect("🏙️ Select City:", options=all_cities, default=[])
 
-# فلتر نوع العقار (مطلوب البحث بحاجة غير السعر والسنة)
 all_types = sorted(df["Property_Type"].dropna().astype(str).unique().tolist())
-selected_types = st.sidebar.multiselect("🏘️ نوع العقار (Property Type):", options=all_types, default=[])
+selected_types = st.sidebar.multiselect("🏘️ Property Type:", options=all_types, default=[])
 
-# فلتر حالة التشطيب
 all_finish = sorted(df["Finishing_Condition"].dropna().astype(str).unique().tolist())
-selected_finish = st.sidebar.multiselect("🛠️ حالة التشطيب (Finishing):", options=all_finish, default=[])
+selected_finish = st.sidebar.multiselect("🛠️ Finishing Condition:", options=all_finish, default=[])
 
-# فلتر السنة
 min_yr = int(df["Year"].min())
 max_yr = int(df["Year"].max())
 if min_yr == max_yr:
     min_yr, max_yr = 2010, 2026
-selected_years = st.sidebar.slider("📅 نطاق السنين (Year Range):", min_yr, max_yr, (min_yr, max_yr))
+selected_years = st.sidebar.slider("📅 Year Range:", min_yr, max_yr, (min_yr, max_yr))
 
-# فلتر السعر
 min_price = float(df["Price_EGP"].min())
 max_price = float(df["Price_EGP"].max())
 selected_price = st.sidebar.slider(
-    "💰 نطاق السعر (Price Range EGP):",
+    "💰 Price Range (EGP):",
     min_value=min_price,
     max_value=max_price,
     value=(min_price, max_price),
-    step=10000.0
+    step=50000.0
 )
 
-# فلتر المساحة
 min_area = int(df["Area_Sqm"].min())
 max_area = int(df["Area_Sqm"].max())
 selected_area = st.sidebar.slider(
-    "📐 نطاق المساحة (Area Sqm):",
+    "📐 Area Range (Sqm):",
     min_value=min_area,
     max_value=max_area,
     value=(min_area, max_area)
 )
 
-# زرار البحث وإعادة الضبط
+# Manage Search State so matched properties remain displayed after clicking Search
+if "show_search_results" not in st.session_state:
+    st.session_state.show_search_results = False
+
 col_btn1, col_btn2 = st.sidebar.columns(2)
 with col_btn1:
-    search_clicked = st.button("🔍 بحث وتطبيق", use_container_width=True)
+    search_clicked = st.button("🔍 Search", use_container_width=True)
 with col_btn2:
-    reset_clicked = st.button("🔄 عرض الكل", use_container_width=True)
+    reset_clicked = st.button("🔄 Reset All", use_container_width=True)
 
-# 5. تطبيق الفلاتر على البيانات
+if search_clicked:
+    st.session_state.show_search_results = True
+if reset_clicked:
+    st.session_state.show_search_results = False
+
+# 5. Apply Selected Filters
 filtered_df = df.copy()
 
 if not reset_clicked:
-    if search_query.strip():
-        q = search_query.strip().lower()
-        mask = (
-            filtered_df["City"].astype(str).str.lower().str.contains(q, na=False)
-            | filtered_df["Property_Type"].astype(str).str.lower().str.contains(q, na=False)
-            | filtered_df["Finishing_Condition"].astype(str).str.lower().str.contains(q, na=False)
-        )
-        filtered_df = filtered_df[mask]
-
     if selected_cities:
         filtered_df = filtered_df[filtered_df["City"].isin(selected_cities)]
 
@@ -212,43 +257,61 @@ if not reset_clicked:
         (filtered_df["Area_Sqm"] >= selected_area[0]) & (filtered_df["Area_Sqm"] <= selected_area[1])
     ]
 
-if search_clicked:
-    st.sidebar.success(f"تم العثور على {len(filtered_df):,} عقار مطابق للبحث!")
-
-# 6. المؤشرات الرئيسية بالأرقام الحقيقية (KPIs)
-st.subheader("📊 المؤشرات الرئيسية للسوق (Key Market Indicators)")
+# 6. Key Market Indicators (KPIs)
+st.subheader("📊 Key Market Indicators")
 kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
 if not filtered_df.empty:
     total_props = len(filtered_df)
     real_avg_price = filtered_df["Price_EGP"].mean()
     real_max_price = filtered_df["Price_EGP"].max()
-    real_min_price = filtered_df["Price_EGP"].min()
     avg_area = filtered_df["Area_Sqm"].mean()
 else:
     total_props = 0
     real_avg_price = 0.0
     real_max_price = 0.0
-    real_min_price = 0.0
     avg_area = 0.0
 
 with kpi1:
-    st.metric("🏠 إجمالي العقارات (Total Properties)", f"{total_props:,}")
+    st.metric("🏠 Total Properties", f"{total_props:,}")
 with kpi2:
-    st.metric("💵 متوسط السعر (Average Price)", f"{real_avg_price:,.0f} EGP")
+    st.metric("💵 Average Price", f"{real_avg_price:,.0f} EGP")
 with kpi3:
-    st.metric("🚀 أعلى سعر (Max Price)", f"{real_max_price:,.0f} EGP")
+    st.metric("🚀 Max Price", f"{real_max_price:,.0f} EGP")
 with kpi4:
-    st.metric("📐 متوسط المساحة (Avg Area)", f"{avg_area:,.0f} m²")
+    st.metric("📐 Average Area", f"{avg_area:,.0f} m²")
+
+# 7. Display Specific Matched Properties ONLY When User Clicks Search
+if st.session_state.show_search_results:
+    st.markdown("---")
+    st.subheader(f"🔎 Search Results: Found {len(filtered_df):,} Matching Properties")
+    if not filtered_df.empty:
+        display_cols = [
+            "City", "Property_Type", "Finishing_Condition",
+            "Area_Sqm", "Bedrooms", "Price_EGP", "Price_Per_Sqm", "Year"
+        ]
+        available_cols = [c for c in display_cols if c in filtered_df.columns]
+        results_view = filtered_df[available_cols].sort_values(by="Price_EGP", ascending=False).reset_index(drop=True)
+        results_view.index = results_view.index + 1
+        st.dataframe(
+            results_view.style.format({
+                "Price_EGP": "{:,.0f} EGP",
+                "Price_Per_Sqm": "{:,.0f} EGP/m²",
+                "Area_Sqm": "{:,} m²"
+            }),
+            use_container_width=True
+        )
+    else:
+        st.warning("No properties match the selected search criteria. Please adjust your filters.")
 
 st.markdown("---")
 
-# 7. الرسومات البيانية الأساسية: Pie Chart & Histogram (طلب الدكتور)
-st.subheader("📈 التوزيع الإحصائي للعقارات والأسعار (Pie Chart & Histogram)")
+# 8. Pie Chart & Histogram (Property Types & Price Distribution)
+st.subheader("📈 Market Distribution Analysis (Pie Chart & Histogram)")
 chart_col1, chart_col2 = st.columns(2)
 
 with chart_col1:
-    st.markdown("#### 🥧 توزيع أنواع العقارات (Pie Chart)")
+    st.markdown("#### 🥧 Property Types Distribution (Pie Chart)")
     if not filtered_df.empty:
         prop_counts = filtered_df["Property_Type"].value_counts().reset_index()
         prop_counts.columns = ["Property_Type", "Count"]
@@ -257,37 +320,37 @@ with chart_col1:
             names="Property_Type",
             values="Count",
             hole=0.35,
-            title="نسبة كل نوع عقار في السوق (Property Types Share)",
+            title="Share of Property Types in the Market",
             color_discrete_sequence=px.colors.qualitative.Bold
         )
         fig_pie.update_traces(textposition="inside", textinfo="percent+label")
         st.plotly_chart(fig_pie, use_container_width=True)
     else:
-        st.warning("لا توجد بيانات مطابقة للفلاتر المختارة.")
+        st.warning("No data available for the selected filters.")
 
 with chart_col2:
-    st.markdown("#### 📊 التوزيع التكراري للأسعار (Price Histogram)")
+    st.markdown("#### 📊 Price Distribution (Histogram)")
     if not filtered_df.empty:
         fig_hist = px.histogram(
             filtered_df,
             x="Price_EGP",
             nbins=30,
             color="Property_Type",
-            title="توزيع فئات أسعار العقارات (Price Distribution Histogram)",
-            labels={"Price_EGP": "السعر بالجنيه (Price EGP)", "count": "عدد العقارات"}
+            title="Distribution of Property Prices (EGP)",
+            labels={"Price_EGP": "Price (EGP)", "count": "Number of Properties"}
         )
         fig_hist.update_layout(bargap=0.08)
         st.plotly_chart(fig_hist, use_container_width=True)
     else:
-        st.warning("لا توجد بيانات مطابقة للفلاتر المختارة.")
+        st.warning("No data available for the selected filters.")
 
 st.markdown("---")
 
-# 8. رسومات إضافية: Histogram للمساحات + Pie Chart للتشطيبات
+# 9. Finishing Pie Chart & Area Histogram
 row2_col1, row2_col2 = st.columns(2)
 
 with row2_col1:
-    st.markdown("#### 🥧 توزيع حالات التشطيب (Finishing Pie Chart)")
+    st.markdown("#### 🥧 Finishing Condition Share (Pie Chart)")
     if not filtered_df.empty:
         finish_counts = filtered_df["Finishing_Condition"].value_counts().reset_index()
         finish_counts.columns = ["Finishing_Condition", "Count"]
@@ -295,33 +358,33 @@ with row2_col1:
             finish_counts,
             names="Finishing_Condition",
             values="Count",
-            title="نسب حالات التشطيب (Finishing Condition Share)",
+            title="Distribution of Properties by Finishing Condition",
             color_discrete_sequence=px.colors.qualitative.Pastel
         )
         fig_pie_finish.update_traces(textposition="inside", textinfo="percent+label")
         st.plotly_chart(fig_pie_finish, use_container_width=True)
 
 with row2_col2:
-    st.markdown("#### 📊 التوزيع التكراري للمساحات (Area Histogram)")
+    st.markdown("#### 📊 Property Area Distribution (Histogram)")
     if not filtered_df.empty:
         fig_area_hist = px.histogram(
             filtered_df,
             x="Area_Sqm",
             nbins=25,
             color="Finishing_Condition",
-            title="توزيع مساحات العقارات بالمتر المربع (Area Sqm Histogram)",
-            labels={"Area_Sqm": "المساحة بالمتر المربع (m²)"}
+            title="Distribution of Property Areas (Sqm)",
+            labels={"Area_Sqm": "Area (m²)", "count": "Number of Properties"}
         )
         fig_area_hist.update_layout(bargap=0.08)
         st.plotly_chart(fig_area_hist, use_container_width=True)
 
 st.markdown("---")
 
-# 9. تحليل الاتجاه الزمني ومقارنة المدن (Line Chart & Bar Chart)
+# 10. Yearly Price Trend & Distinct Average Price by City
 row3_col1, row3_col2 = st.columns(2)
 
 with row3_col1:
-    st.markdown("#### 📈 تطور متوسط الأسعار عبر السنين (2010 - 2026)")
+    st.markdown("#### 📈 Yearly Average Price Trend (2010 - 2026)")
     if not filtered_df.empty:
         yearly_trend = filtered_df.groupby("Year")["Price_EGP"].mean().reset_index()
         fig_line = px.line(
@@ -329,33 +392,28 @@ with row3_col1:
             x="Year",
             y="Price_EGP",
             markers=True,
-            title="اتجاه متوسط أسعار العقارات سنويًا (Yearly Average Price Trend)",
-            labels={"Year": "السنة", "Price_EGP": "متوسط السعر (EGP)"}
+            title="Yearly Average Property Price Trend (EGP)",
+            labels={"Year": "Year", "Price_EGP": "Average Price (EGP)"}
         )
         st.plotly_chart(fig_line, use_container_width=True)
 
 with row3_col2:
-    st.markdown("#### 🏙️ متوسط الأسعار حسب المدينة (Average Price by City)")
+    st.markdown("#### 🏙️ Average Property Price by City")
     if not filtered_df.empty:
         city_avg = (
             filtered_df.groupby("City")["Price_EGP"]
             .mean()
             .reset_index()
             .sort_values(by="Price_EGP", ascending=False)
-            .head(10)
         )
         fig_bar = px.bar(
             city_avg,
             x="City",
             y="Price_EGP",
             color="City",
-            title="أعلى المدن من حيث متوسط السعر (Top Cities by Avg Price)",
-            labels={"City": "المدينة", "Price_EGP": "متوسط السعر (EGP)"}
+            text_auto=".3s",
+            title="Average Property Price Across Cities (EGP)",
+            labels={"City": "City", "Price_EGP": "Average Price (EGP)"}
         )
+        fig_bar.update_traces(textposition="outside")
         st.plotly_chart(fig_bar, use_container_width=True)
-
-st.markdown("---")
-
-# 10. جدول عرض البيانات المفلترة
-st.subheader("📋 جدول البيانات التفصيلي (Filtered Properties Data)")
-st.dataframe(filtered_df.head(200), use_container_width=True)
