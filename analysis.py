@@ -1,18 +1,31 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
+
+# 1. Page Configuration
+st.set_page_config(
+    page_title="RealEstateWise Dashboard",
+    page_icon="🏢",
+    layout="wide"
+)
+
+# 2. Main Header (English)
+st.title("🏢 RealEstateWise - Market Intelligence Dashboard")
+st.caption("Interactive Dashboard Analyzing Egyptian Real Estate Market Trends (2010 - 2026)")
+st.divider()
 
 
-# 1. Load and Clean Real Estate Dataset from Google Drive
-def load_and_clean_data(file_id="15TCcSWd1skf6bhctmy6EZ-BucamsxaO"):
-    """
-    Loads the Egyptian Real Estate dataset from Google Drive,
-    cleans numeric columns, standardizes column names, and computes Price_Per_Sqm.
-    """
+# 3. Fast Data Loader (Optimized to prevent Black Screen / Memory Crash)
+@st.cache_data(show_spinner="Loading Real Estate Market Data...")
+def load_data():
+    file_id = "15TCcSWd1skf6bhctmy6EZ-BucamsxaO"
     url = f"https://drive.usercontent.google.com/download?id={file_id}&export=download&confirm=t"
 
     df = None
     try:
-        temp_df = pd.read_csv(url, low_memory=False)
+        # Read 10,000 rows max so the browser never freezes on a black screen
+        temp_df = pd.read_csv(url, nrows=10000, low_memory=False)
         if len(temp_df.columns) > 2 and not str(temp_df.columns[0]).strip().startswith("<"):
             df = temp_df
     except Exception:
@@ -68,6 +81,7 @@ def load_and_clean_data(file_id="15TCcSWd1skf6bhctmy6EZ-BucamsxaO"):
     types_list = ["Apartment", "Villa", "Townhouse", "Duplex", "Chalet", "Studio", "Penthouse"]
     finish_list = ["Ultra Super Lux", "Super Lux", "Lux", "Semi-Finished", "Core & Shell"]
 
+    # Realistic multipliers so each city has a distinct average price
     city_multipliers = {
         "New Cairo": 1.48,
         "Sheikh Zayed": 1.42,
@@ -160,164 +174,168 @@ def load_and_clean_data(file_id="15TCcSWd1skf6bhctmy6EZ-BucamsxaO"):
     return df
 
 
-# 2. Compute Overall Market KPIs
-def get_market_kpis(df):
-    """Returns a dictionary of key real estate market indicators."""
-    if df.empty:
-        return {
-            "Total_Properties": 0,
-            "Average_Price_EGP": 0.0,
-            "Max_Price_EGP": 0.0,
-            "Min_Price_EGP": 0.0,
-            "Median_Price_EGP": 0.0,
-            "Average_Area_Sqm": 0.0,
-            "Average_Price_Per_Sqm": 0.0
-        }
+df = load_data()
 
-    return {
-        "Total_Properties": int(len(df)),
-        "Average_Price_EGP": round(float(df["Price_EGP"].mean()), 2),
-        "Max_Price_EGP": round(float(df["Price_EGP"].max()), 2),
-        "Min_Price_EGP": round(float(df["Price_EGP"].min()), 2),
-        "Median_Price_EGP": round(float(df["Price_EGP"].median()), 2),
-        "Average_Area_Sqm": round(float(df["Area_Sqm"].mean()), 2),
-        "Average_Price_Per_Sqm": round(float(df["Price_Per_Sqm"].mean()), 2)
-    }
+# 4. Sidebar Filters (English Only - Keyword Input Removed as Requested)
+st.sidebar.header("🔍 Dashboard Filters")
 
+all_cities = sorted(df["City"].dropna().astype(str).unique().tolist())
+selected_cities = st.sidebar.multiselect("🏙️ Select City:", options=all_cities, default=[])
 
-# 3. City-Level Price & Volume Analysis
-def analyze_by_city(df):
-    """Calculates property count, average price, max price, and avg price/sqm per city."""
-    city_stats = (
-        df.groupby("City")
-        .agg(
-            Total_Properties=("Price_EGP", "count"),
-            Average_Price_EGP=("Price_EGP", "mean"),
-            Max_Price_EGP=("Price_EGP", "max"),
-            Min_Price_EGP=("Price_EGP", "min"),
-            Average_Area_Sqm=("Area_Sqm", "mean"),
-            Avg_Price_Per_Sqm=("Price_Per_Sqm", "mean")
-        )
-        .reset_index()
-        .sort_values(by="Average_Price_EGP", ascending=False)
-    )
-    return city_stats.round(0)
+all_types = sorted(df["Property_Type"].dropna().astype(str).unique().tolist())
+selected_types = st.sidebar.multiselect("🏘️ Property Type:", options=all_types, default=[])
 
+all_finish = sorted(df["Finishing_Condition"].dropna().astype(str).unique().tolist())
+selected_finish = st.sidebar.multiselect("🛠️ Finishing Condition:", options=all_finish, default=[])
 
-# 4. Property Type Distribution Analysis (For Pie Chart & Summary)
-def analyze_by_property_type(df):
-    """Calculates count, percentage share, and average price for each property type."""
-    type_stats = (
-        df.groupby("Property_Type")
-        .agg(
-            Count=("Price_EGP", "count"),
-            Average_Price_EGP=("Price_EGP", "mean"),
-            Max_Price_EGP=("Price_EGP", "max"),
-            Average_Area_Sqm=("Area_Sqm", "mean")
-        )
-        .reset_index()
-        .sort_values(by="Count", ascending=False)
-    )
-    type_stats["Market_Share_Pct"] = round((type_stats["Count"] / len(df)) * 100, 2)
-    return type_stats.round(2)
+min_yr = int(df["Year"].min())
+max_yr = int(df["Year"].max())
+if min_yr == max_yr:
+    min_yr, max_yr = 2010, 2026
+selected_years = st.sidebar.slider("📅 Year Range:", min_yr, max_yr, (min_yr, max_yr))
 
+min_price = float(df["Price_EGP"].min())
+max_price = float(df["Price_EGP"].max())
+selected_price = st.sidebar.slider(
+    "💰 Price Range (EGP):",
+    min_value=min_price,
+    max_value=max_price,
+    value=(min_price, max_price),
+    step=50000.0
+)
 
-# 5. Finishing Condition Analysis
-def analyze_by_finishing(df):
-    """Calculates count, percentage share, and average price by finishing condition."""
-    finish_stats = (
-        df.groupby("Finishing_Condition")
-        .agg(
-            Count=("Price_EGP", "count"),
-            Average_Price_EGP=("Price_EGP", "mean"),
-            Avg_Price_Per_Sqm=("Price_Per_Sqm", "mean")
-        )
-        .reset_index()
-        .sort_values(by="Average_Price_EGP", ascending=False)
-    )
-    finish_stats["Share_Pct"] = round((finish_stats["Count"] / len(df)) * 100, 2)
-    return finish_stats.round(2)
+min_area = int(df["Area_Sqm"].min())
+max_area = int(df["Area_Sqm"].max())
+selected_area = st.sidebar.slider(
+    "📐 Area Range (Sqm):",
+    min_value=min_area,
+    max_value=max_area,
+    value=(min_area, max_area)
+)
 
+if "show_search_results" not in st.session_state:
+    st.session_state.show_search_results = False
 
-# 6. Yearly Market Trend Analysis (2010 - 2026)
-def analyze_yearly_trends(df):
-    """Calculates annual average price, property volume, and YoY growth percentage."""
-    yearly = (
-        df.groupby("Year")
-        .agg(
-            Properties_Listed=("Price_EGP", "count"),
-            Average_Price_EGP=("Price_EGP", "mean"),
-            Max_Price_EGP=("Price_EGP", "max"),
-            Avg_Price_Per_Sqm=("Price_Per_Sqm", "mean")
-        )
-        .reset_index()
-        .sort_values(by="Year", ascending=True)
-    )
-    yearly["YoY_Growth_Pct"] = yearly["Average_Price_EGP"].pct_change() * 100
-    return yearly.fillna(0).round(2)
+col_btn1, col_btn2 = st.sidebar.columns(2)
+with col_btn1:
+    search_clicked = st.button("🔍 Search", use_container_width=True)
+with col_btn2:
+    reset_clicked = st.button("🔄 Reset All", use_container_width=True)
 
+if search_clicked:
+    st.session_state.show_search_results = True
+if reset_clicked:
+    st.session_state.show_search_results = False
 
-# 7. Multi-Criteria Property Search (Returns Detailed Matched Properties)
-def search_properties(
-    df,
-    cities=None,
-    property_types=None,
-    finishing=None,
-    year_range=None,
-    price_range=None,
-    area_range=None
-):
-    """Filters properties based on user criteria and returns detailed records."""
-    filtered = df.copy()
+# 5. Filter Data
+filtered_df = df.copy()
 
-    if cities:
-        filtered = filtered[filtered["City"].isin(cities)]
-    if property_types:
-        filtered = filtered[filtered["Property_Type"].isin(property_types)]
-    if finishing:
-        filtered = filtered[filtered["Finishing_Condition"].isin(finishing)]
-    if year_range:
-        filtered = filtered[
-            (filtered["Year"] >= year_range[0]) & (filtered["Year"] <= year_range[1])
-        ]
-    if price_range:
-        filtered = filtered[
-            (filtered["Price_EGP"] >= price_range[0]) & (filtered["Price_EGP"] <= price_range[1])
-        ]
-    if area_range:
-        filtered = filtered[
-            (filtered["Area_Sqm"] >= area_range[0]) & (filtered["Area_Sqm"] <= area_range[1])
-        ]
+if not reset_clicked:
+    if selected_cities:
+        filtered_df = filtered_df[filtered_df["City"].isin(selected_cities)]
+    if selected_types:
+        filtered_df = filtered_df[filtered_df["Property_Type"].isin(selected_types)]
+    if selected_finish:
+        filtered_df = filtered_df[filtered_df["Finishing_Condition"].isin(selected_finish)]
 
-    cols = [
-        "City", "Property_Type", "Finishing_Condition",
-        "Area_Sqm", "Bedrooms", "Price_EGP", "Price_Per_Sqm", "Year"
+    filtered_df = filtered_df[
+        (filtered_df["Year"] >= selected_years[0]) & (filtered_df["Year"] <= selected_years[1])
     ]
-    available_cols = [c for c in cols if c in filtered.columns]
-    return filtered[available_cols].sort_values(by="Price_EGP", ascending=False).reset_index(drop=True)
+    filtered_df = filtered_df[
+        (filtered_df["Price_EGP"] >= selected_price[0]) & (filtered_df["Price_EGP"] <= selected_price[1])
+    ]
+    filtered_df = filtered_df[
+        (filtered_df["Area_Sqm"] >= selected_area[0]) & (filtered_df["Area_Sqm"] <= selected_area[1])
+    ]
 
+# 6. Key Market Indicators (KPIs)
+st.subheader("📊 Key Market Indicators")
+kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
-# 8. Run Standalone Statistical Report
-if __name__ == "__main__":
-    print("=" * 65)
-    print("REALESTATEWISE - EGYPTIAN REAL ESTATE MARKET ANALYSIS (2010-2026)")
-    print("=" * 65)
+if not filtered_df.empty:
+    total_props = len(filtered_df)
+    real_avg_price = filtered_df["Price_EGP"].mean()
+    real_max_price = filtered_df["Price_EGP"].max()
+    avg_area = filtered_df["Area_Sqm"].mean()
+else:
+    total_props = 0
+    real_avg_price = 0.0
+    real_max_price = 0.0
+    avg_area = 0.0
 
-    dataset = load_and_clean_data()
+with kpi1:
+    st.metric("🏠 Total Properties", f"{total_props:,}")
+with kpi2:
+    st.metric("💵 Average Price", f"{real_avg_price:,.0f} EGP")
+with kpi3:
+    st.metric("🚀 Max Price", f"{real_max_price:,.0f} EGP")
+with kpi4:
+    st.metric("📐 Average Area", f"{avg_area:,.0f} m²")
 
-    kpis = get_market_kpis(dataset)
-    print("\n[1] KEY MARKET INDICATORS (KPIs):")
-    for k, v in kpis.items():
-        print(f"  - {k.replace('_', ' ')}: {v:,.0f}")
+# 7. Show Specific Matched Properties with Details When Clicking Search
+if st.session_state.show_search_results:
+    st.divider()
+    st.subheader(f"🔎 Search Results: Found {len(filtered_df):,} Matching Properties")
+    if not filtered_df.empty:
+        display_cols = [
+            "City", "Property_Type", "Finishing_Condition",
+            "Area_Sqm", "Bedrooms", "Price_EGP", "Price_Per_Sqm", "Year"
+        ]
+        available_cols = [c for c in display_cols if c in filtered_df.columns]
+        results_view = (
+            filtered_df[available_cols]
+            .sort_values(by="Price_EGP", ascending=False)
+            .head(500)
+            .reset_index(drop=True)
+        )
+        results_view.index = results_view.index + 1
+        st.dataframe(results_view, use_container_width=True)
+    else:
+        st.warning("No properties match the selected search criteria.")
 
-    print("\n[2] AVERAGE & MAX PRICE BY CITY:")
-    print(analyze_by_city(dataset).to_string(index=False))
+st.divider()
 
-    print("\n[3] PROPERTY TYPES DISTRIBUTION (PIE CHART DATA):")
-    print(analyze_by_property_type(dataset).to_string(index=False))
+# 8. Pie Chart & Histogram
+st.subheader("📈 Market Distribution Analysis (Pie Chart & Histogram)")
+chart_col1, chart_col2 = st.columns(2)
 
-    print("\n[4] FINISHING CONDITION ANALYSIS:")
-    print(analyze_by_finishing(dataset).to_string(index=False))
+with chart_col1:
+    st.markdown("#### 🥧 Property Types Distribution (Pie Chart)")
+    if not filtered_df.empty:
+        prop_counts = filtered_df["Property_Type"].value_counts().reset_index()
+        prop_counts.columns = ["Property_Type", "Count"]
+        fig_pie = px.pie(
+            prop_counts,
+            names="Property_Type",
+            values="Count",
+            hole=0.35,
+            title="Share of Property Types in the Market"
+        )
+        fig_pie.update_traces(textposition="inside", textinfo="percent+label")
+        st.plotly_chart(fig_pie, use_container_width=True)
+    else:
+        st.warning("No data available.")
 
-    print("\n[5] YEARLY AVERAGE PRICE TRENDS:")
-    print(analyze_yearly_trends(dataset).to_string(index=False))
+with chart_col2:
+    st.markdown("#### 📊 Price Distribution (Histogram)")
+    if not filtered_df.empty:
+        fig_hist = px.histogram(
+            filtered_df,
+            x="Price_EGP",
+            nbins=30,
+            color="Property_Type",
+            title="Distribution of Property Prices (EGP)",
+            labels={"Price_EGP": "Price (EGP)", "count": "Number of Properties"}
+        )
+        fig_hist.update_layout(bargap=0.08)
+        st.plotly_chart(fig_hist, use_container_width=True)
+    else:
+        st.warning("No data available.")
+
+st.divider()
+
+# 9. Finishing Pie Chart & Area Histogram
+row2_col1, row2_col2 = st.columns(2)
+
+with row2_col1:
+    st.
