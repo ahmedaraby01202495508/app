@@ -338,4 +338,69 @@ st.divider()
 row2_col1, row2_col2 = st.columns(2)
 
 with row2_col1:
-    st.
+    st.markdown("#### 🥧 Finishing Condition Share (Pie Chart)")
+    if not filtered_df.empty:
+        finish_counts = filtered_df["Finishing_Condition"].value_counts().reset_index()
+        finish_counts.columns = ["Finishing_Condition", "Count"]
+        fig_pie_finish = px.pie(
+            finish_counts,
+            names="Finishing_Condition",
+            values="Count",
+            title="Distribution of Properties by Finishing Condition"
+        )
+        fig_pie_finish.update_traces(textposition="inside", textinfo="percent+label")
+        st.plotly_chart(fig_pie_finish, use_container_width=True)
+
+with row2_col2:
+    st.markdown("#### 📊 Property Area Distribution (Histogram)")
+    if not filtered_df.empty:
+        fig_area_hist = px.histogram(
+            filtered_df,
+            x="Area_Sqm",
+            nbins=25,
+            color="Finishing_Condition",
+            title="Distribution of Property Areas (Sqm)",
+            labels={"Area_Sqm": "Area (m²)", "count": "Number of Properties"}
+        )
+        fig_area_hist.update_layout(bargap=0.08)
+        st.plotly_chart(fig_area_hist, use_container_width=True)
+
+st.divider()
+
+# 10. Yearly Price Trend & Distinct Average Price by City
+row3_col1, row3_col2 = st.columns(2)
+
+with row3_col1:
+    st.markdown("#### 📈 Yearly Average Price Trend (2010 - 2026)")
+    if not filtered_df.empty:
+        yearly_trend = filtered_df.groupby("Year")["Price_EGP"].mean().reset_index()
+        fig_line = px.line(
+            yearly_trend,
+            x="Year",
+            y="Price_EGP",
+            markers=True,
+            title="Yearly Average Property Price Trend (EGP)",
+            labels={"Year": "Year", "Price_EGP": "Average Price (EGP)"}
+        )
+        st.plotly_chart(fig_line, use_container_width=True)
+
+with row3_col2:
+    st.markdown("#### 🏙️ Average Property Price by City")
+    if not filtered_df.empty:
+        city_avg = (
+            filtered_df.groupby("City")["Price_EGP"]
+            .mean()
+            .reset_index()
+            .sort_values(by="Price_EGP", ascending=False)
+        )
+        fig_bar = px.bar(
+            city_avg,
+            x="City",
+            y="Price_EGP",
+            color="City",
+            text_auto=".3s",
+            title="Average Property Price Across Cities (EGP)",
+            labels={"City": "City", "Price_EGP": "Average Price (EGP)"}
+        )
+        fig_bar.update_traces(textposition="outside")
+        st.plotly_chart(fig_bar, use_container_width=True)
