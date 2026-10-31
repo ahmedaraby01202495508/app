@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 
 # 1. إعدادات الصفحة بتصميم يشبه شاشة الموبايل (Figma Prototype UI)
 st.set_page_config(
@@ -16,14 +15,6 @@ st.markdown("""
     .stApp {
         background-color: #0B0F19;
         color: #F3F4F6;
-    }
-    /* إطار يشبه شاشة الموبايل */
-    .mobile-frame {
-        background-color: #111827;
-        border: 2px solid #374151;
-        border-radius: 24px;
-        padding: 20px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     }
     div[data-testid="metric-container"] {
         background-color: #1F2937;
@@ -55,32 +46,56 @@ if "lang" not in st.session_state:
     st.session_state.lang = "العربية"
 
 
-# دالة بيانات وهمية واقعية للعقارات والمدن
+# 2. بيانات واقعية موسعة تشمل كل مدن السوق المصري
 @st.cache_data
-def load_mock_data():
-    return pd.DataFrame({
-        "City": ["التجمع الخامس", "الشيخ زايد", "العاصمة الإدارية", "مصر الجديدة", "التجمع الخامس", "الشيخ زايد"],
-        "Property_Type": ["شقة فاخرة", "فيلا مستقلة", "توين هاوس", "شقة", "دوبلكس", "تاون هاوس"],
-        "Area_Sqm": [165, 350, 210, 130, 280, 240],
-        "Bedrooms": [3, 5, 3, 2, 4, 4],
-        "Current_Price": [4500000, 14000000, 6200000, 3200000, 8500000, 9100000],
-        "Future_Price_5Y": [7200000, 22000000, 10500000, 49000000, 13500000, 14200000],
-        "Features": ["جراج خاص، أمن 24/7", "حديقة خاصة، حمام سباحة", "إطلالة على النهر الأخضر", "قريب من المترو", "تشطيبات فائقة", "نادي صحي"]
-    })
+def load_extended_data():
+    cities = [
+        "التجمع الخامس", "الشيخ زايد", "العاصمة الإدارية", 
+        "مصر الجديدة", "مدينة نصر", "6 أكتوبر", 
+        "المعادي", "الشروق", "الهرم", "زايد الجديدة"
+    ]
+    types_ar = ["شقة فاخرة", "فيلا مستقلة", "توين هاوس", "دوبلكس", "تاون هاوس"]
+    types_en = ["Luxury Apartment", "Standalone Villa", "Twin House", "Duplex", "Townhouse"]
+    
+    np.random.seed(42)
+    n = 150
+    
+    data = []
+    for i in range(n):
+        c = np.random.choice(cities)
+        t_idx = np.random.randint(0, len(types_ar))
+        area = np.random.randint(100, 450)
+        beds = np.random.randint(2, 6)
+        curr_price = area * np.random.randint(25000, 45000)
+        fut_price = curr_price * np.random.uniform(1.5, 1.8)
+        
+        data.append({
+            "City": c,
+            "Property_Type_Ar": types_ar[t_idx],
+            "Property_Type_En": types_en[t_idx],
+            "Area_Sqm": area,
+            "Bedrooms": beds,
+            "Current_Price": curr_price,
+            "Future_Price_5Y": fut_price,
+            "Features_Ar": "جراج خاص، أمن 24/7، تشطيبات فاخرة",
+            "Features_En": "Private garage, 24/7 security, luxury finishes"
+        })
+    return pd.DataFrame(data)
 
-df_props = load_mock_data()
+df_props = load_extended_data()
 
 
 # ==========================================
-# 1. LOGIN / SIGN IN SCREEN (شاشة تسجيل الدخول واللوجو)
+# 3. شاشة تسجيل الدخول واللوجو (Login / Sign In)
 # ==========================================
 if not st.session_state.logged_in:
     col_l1, col_l2 = st.columns([2, 1])
     with col_l2:
-        st.session_state.lang = st.selectbox("🌐 Language", ["العربية", "English"])
+        selected_login_lang = st.selectbox("🌐 Language", ["العربية", "English"])
+        st.session_state.lang = selected_login_lang
 
     st.markdown("<div style='text-align: center; margin-top: 10px;'>", unsafe_allow_html=True)
-    # عرض اللوجو الخاص بك المرفق في المحادثة
+    # عرض اللوجو الخاص بك
     st.image("https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=180", width=110)
     
     if st.session_state.lang == "العربية":
@@ -88,7 +103,7 @@ if not st.session_state.logged_in:
         st.markdown("<p style='color: #9CA3AF;'>بوابتك الذكية للبحث العقاري والتقييم المستقبلي</p>", unsafe_allow_html=True)
         email_lbl = "البريد الإلكتروني (Email)"
         pass_lbl = "كلمة المرور (Password)"
-        forgot_lbl = "هل نسيت كلمة المرور؟ (Forgot Password)"
+        forgot_lbl = "هل نسيت كلمة المرور؟"
         login_btn = "تسجيل الدخول (Sign In)"
     else:
         st.markdown("<h2 style='color: #6366F1; margin-top: 10px;'>Aqarok Prototype</h2>", unsafe_allow_html=True)
@@ -114,13 +129,15 @@ if not st.session_state.logged_in:
             st.warning("Please enter your email / يرجى إدخال البريد الإلكتروني.")
 
 # ==========================================
-# MAIN APP NAVIGATION (التنقل بين الأقسام الـ 4 المطلوبة)
+# 4. التطبيق الرئيسي بعد الدخول (Figma Mockup Views)
 # ==========================================
 else:
-    # قائمة التنقل تشبه تصميمات تطبيقات الموبايل الحديثة
-    if st.session_state.lang == "العربية":
+    is_ar = (st.session_state.lang == "العربية")
+    
+    # القائمة السفلية أو الجانبية المبرمجة كأنها تطبيق موبايل
+    if is_ar:
         nav_choice = st.sidebar.radio(
-            "📱 شاشات التطبيق (Figma Screens):",
+            "📱 شاشات التطبيق:",
             [
                 "🏠 1. Property Finder (البحث عن عقار)",
                 "⚖️ 2. City Comparison (مقارنة المدن)",
@@ -130,7 +147,7 @@ else:
         )
     else:
         nav_choice = st.sidebar.radio(
-            "📱 App Screens (Figma View):",
+            "📱 App Screens:",
             [
                 "🏠 1. Property Finder",
                 "⚖️ 2. City Comparison",
@@ -144,115 +161,141 @@ else:
         st.rerun()
 
     # ------------------------------------------
-    # SCREEN 2: PROPERTY FINDER
+    # SCREEN 1: PROPERTY FINDER
     # ------------------------------------------
     if "Property Finder" in nav_choice or "البحث عن عقار" in nav_choice:
-        if st.session_state.lang == "العربية":
+        if is_ar:
             st.subheader("🏠 Property Finder (البحث عن العقارات)")
-            st.caption("أدخل مواصفات العقار الذي تبحث عنه لعرض عروض البيع والأسعار المستقبلية.")
+            st.caption("اختر مواصفات العقار والمنطقة لعرض عروض البيع والأسعار المستقبلية المتوقعة.")
+            lbl_city = "📍 اختر المنطقة / المدن المتاحة"
+            lbl_type = "🏘️ نوع العقار"
+            lbl_area = "📐 الحد الأدنى للمساحة (م²)"
+            lbl_budget = "💰 الميزانية القصوى (جنيه)"
+            lbl_results = "العقارات المناسبة"
         else:
             st.subheader("🏠 Property Finder")
-            st.caption("Filter property specs to explore listings and future price forecasts.")
+            st.caption("Select property specs and location to explore available listings & forecasts.")
+            lbl_city = "📍 Select City / Location"
+            lbl_type = "🏘️ Property Type"
+            lbl_area = "📐 Min Area (Sqm)"
+            lbl_budget = "Max Budget (EGP)"
+            lbl_results = "Matching Properties"
 
         st.divider()
 
-        # إدخال مواصفات العقار
+        all_cities_list = ["الكل / All"] + sorted(df_props["City"].unique().tolist())
         c1, c2 = st.columns(2)
         with c1:
-            sel_city = st.selectbox("📍 المنطقة / المدينة", ["الكل", "التجمع الخامس", "الشيخ زايد", "العاصمة الإدارية", "مصر الجديدة"])
-            sel_type = st.selectbox("🏘️ نوع العقار", ["الكل", "شقة فاخرة", "فيلا مستقلة", "توين هاوس", "دوبلكس"])
+            sel_city = st.selectbox(lbl_city, all_cities_list)
+            type_options = ["الكل / All"] + (df_props["Property_Type_Ar"].unique().tolist() if is_ar else df_props["Property_Type_En"].unique().tolist())
+            sel_type = st.selectbox(lbl_type, type_options)
         with c2:
-            min_area = st.number_input("📐 الحد الأدنى للمساحة (م²)", min_value=50, max_value=500, value=120)
-            budget = st.slider("💰 الميزانية القصوى (جنيه)", 2000000, 20000000, 10000000, step=500000)
+            min_area = st.number_input(lbl_area, min_value=50, max_value=500, value=120)
+            max_budget = st.slider(lbl_budget, 2000000, 20000000, 10000000, step=500000)
 
         # فلترة البيانات
         filtered = df_props.copy()
-        if sel_city != "الكل":
+        if sel_city != "الكل / All":
             filtered = filtered[filtered["City"] == sel_city]
-        if sel_type != "الكل":
-            filtered = filtered[filtered["Property_Type"] == sel_type]
-        filtered = filtered[(filtered["Area_Sqm"] >= min_area) & (filtered["Current_Price"] <= budget)]
+        if sel_type != "الكل / All":
+            col_t = "Property_Type_Ar" if is_ar else "Property_Type_En"
+            filtered = filtered[filtered[col_t] == sel_type]
+            
+        filtered = filtered[(filtered["Area_Sqm"] >= min_area) & (filtered["Current_Price"] <= max_budget)]
 
         st.divider()
-        st.markdown(f"### 📋 العقارات المناسبة ({len(filtered)} عقار متاح)")
+        st.markdown(f"### 📋 {lbl_results} ({len(filtered)})")
 
         if not filtered.empty:
-            for idx, row in filtered.iterrows():
+            for idx, row in filtered.head(20).iterrows():
+                p_type = row['Property_Type_Ar'] if is_ar else row['Property_Type_En']
+                feats = row['Features_Ar'] if is_ar else row['Features_En']
+                
                 with st.container():
-                    st.markdown(f"""
-                    **{row['Property_Type']} في {row['City']}**  
-                    📐 المساحة: {row['Area_Sqm']} م² | 🛏️ الغرف: {row['Bedrooms']}  
-                    💵 **السعر الحالي:** {row['Current_Price']:,.0f} ج.م  
-                    📈 **السعر المتوقع (بعد 5 سنوات):** <span style='color: #10B981;'>{row['Future_Price_5Y']:,.0f} ج.م</span>  
-                    ✨ **المميزات:** {row['Features']}
-                    """, unsafe_allow_html=True)
+                    if is_ar:
+                        st.markdown(f"""
+                        **{p_type} في {row['City']}**  
+                        📐 المساحة: {row['Area_Sqm']} م² | 🛏️ الغرف: {row['Bedrooms']}  
+                        💵 **السعر الحالي:** {row['Current_Price']:,.0f} ج.م  
+                        📈 **السعر المتوقع (بعد 5 سنوات):** <span style='color: #10B981;'>{row['Future_Price_5Y']:,.0f} ج.م</span>  
+                        ✨ **المميزات:** {feats}
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"""
+                        **{p_type} in {row['City']}**  
+                        📐 Area: {row['Area_Sqm']} m² | 🛏️ Beds: {row['Bedrooms']}  
+                        💵 **Current Price:** {row['Current_Price']:,.0f} EGP  
+                        📈 **5-Year Forecast:** <span style='color: #10B981;'>{row['Future_Price_5Y']:,.0f} EGP</span>  
+                        ✨ **Features:** {feats}
+                        """, unsafe_allow_html=True)
                     st.divider()
         else:
-            st.warning("لا توجد عقارات مطابقة تماماً لشروط البحث، جرب تعديل الميزانية أو المساحة.")
+            st.warning("No properties match your criteria / لا توجد عقارات مطابقة لشروط البحث.")
 
     # ------------------------------------------
-    # SCREEN 3: CITY COMPARISON
+    # SCREEN 2: CITY COMPARISON
     # ------------------------------------------
     elif "City Comparison" in nav_choice or "مقارنة المدن" in nav_choice:
-        if st.session_state.lang == "العربية":
-            st.subheader("⚖️ City Comparison (مقارنة بين مدينتين)")
-            st.caption("قارن الأسعار المستقبلية والمميزات بين مدينتين لتحديد أفضل فرصة استثمارية.")
+        if is_ar:
+            st.subheader("⚖️ City Comparison (مقارنة بين المدن)")
+            st.caption("قارن بين أي مدينتين من المدن الجديدة لمعرفة متوسط الأسعار ومعدل النمو.")
         else:
             st.subheader("⚖️ City Comparison")
-            st.caption("Compare current and future pricing, advantages, and maps between two cities.")
+            st.caption("Compare pricing metrics and growth forecasts between two cities.")
 
         st.divider()
 
+        cities_available = sorted(df_props["City"].unique().tolist())
         cc1, cc2 = st.columns(2)
         with cc1:
-            city_1 = st.selectbox("المدينة الأولى", ["التجمع الخامس", "الشيخ زايد", "العاصمة الإدارية"], index=0)
+            city_1 = st.selectbox("City 1 / المدينة الأولى", cities_available, index=0)
         with cc2:
-            city_2 = st.selectbox("المدينة الثانية", ["التجمع الخامس", "الشيخ زايد", "العاصمة الإدارية"], index=1)
+            city_2 = st.selectbox("City 2 / المدينة الثانية", cities_available, index=1 if len(cities_available)>1 else 0)
 
         st.divider()
 
-        # جدول مقارنة الأسعار والمميزات
+        # حساب متوسطات حقيقية من الداتا
+        mean_p1 = df_props[df_props["City"] == city_1]["Current_Price"].mean() / 150
+        mean_p2 = df_props[df_props["City"] == city_2]["Current_Price"].mean() / 150
+        
         comp_summary = {
-            "المؤشر الاستثماري": ["متوسط سعر المتر الحالي", "السعر المتوقع (5 سنوات)", "معدل النمو المتوقع", "أبرز المميزات"],
-            city_1: ["32,000 ج.م / م²", "51,000 ج.م / م²", "+59.3%", "قرب المدارس الدولية والخدمات، شبكة طرق جديدة"],
-            city_2: ["38,000 ج.م / م²", "60,000 ج.م / م²", "+57.8%", "هدوء، مساحات خضراء واسعة، مجتمعات بوابات مغلقة"]
+            "Metric / المؤشر": ["Average Price / m²", "5Y Forecast / m²", "Growth Rate", "Available Listings"],
+            city_1: [f"{mean_p1:,.0f} EGP", f"{mean_p1*1.6:,.0f} EGP", "+60%", f"{len(df_props[df_props['City']==city_1])}"],
+            city_2: [f"{mean_p2:,.0f} EGP", f"{mean_p2*1.55:,.0f} EGP", "+55%", f"{len(df_props[df_props['City']==city_2])}"]
         }
         st.table(pd.DataFrame(comp_summary))
 
-        st.markdown("🗺️ **خريطة الموقع التفاعلية (Location Map Preview):**")
-        # محاكاة عرض خريطة لكل مدينة
-        map_data = pd.DataFrame({
-            'lat': [30.0444, 30.0131],
-            'lon': [31.4556, 30.9853]
-        })
-        st.map(map_data, zoom=9)
-
     # ------------------------------------------
-    # SCREEN 4: SETTINGS & SUPPORT
+    # SCREEN 3: SETTINGS & SUPPORT (إعدادات اللغة والحساب)
     # ------------------------------------------
     elif "Settings" in nav_choice or "الإعدادات والدعم" in nav_choice:
-        if st.session_state.lang == "العربية":
+        if is_ar:
             st.subheader("⚙️ Settings & Support (الإعدادات والدعم)")
-            st.caption("إدارة الحساب، الدعم الفني، وسياسة الخصوصية.")
+            st.caption("تغيير اللغة، إعدادات الحساب، وخدمة العملاء.")
         else:
             st.subheader("⚙️ Settings & Support")
-            st.caption("App settings, account profile, customer service, and support.")
+            st.caption("Language settings, account profile, and technical support.")
 
         st.divider()
 
-        st.markdown("👤 **تعديل الحساب (Account Settings):**")
-        st.text_input("الاسم بالكامل", value="أحمد محمد (مقيم عقاري)")
-        st.text_input("رقم الهاتف", value="+20 1012345678")
-        if st.button("حفظ التعديلات"):
-            st.success("تم تحديث بيانات الحساب بنجاح.")
+        # 🌐 خيار تغيير اللغة الفعلي المطلوب
+        st.markdown("🌐 **Language Preferences / لغة التطبيق:**")
+        new_lang = st.selectbox("Choose Language", ["العربية", "English"], index=0 if is_ar else 1)
+        if new_lang != st.session_state.lang:
+            st.session_state.lang = new_lang
+            st.rerun()
 
         st.divider()
-        st.markdown("📞 **خدمة العملاء والدعم الفني (Customer Support):**")
-        st.info("💬 البريد الإلكتروني للدعم: support@aqarok.com \n📞 الخط الساخن: 19888 (متاح 24/7)")
+        st.markdown("👤 **Account Settings / تعديل الحساب:**")
+        st.text_input("Full Name", value="أحمد محمد (Aqarok Expert)")
+        st.text_input("Phone Number", value="+20 1012345678")
+        if st.button("Save Changes"):
+            st.success("Changes saved successfully!")
 
         st.divider()
-        st.markdown("ℹ️ **عن التطبيق وسياسة الخصوصية (About Us & Privacy):**")
-        st.write("""
-        * **About Us:** منصة "عقارك" هي النظام الذكي الأول لمساعدة المستثمرين والموظفيم في تقييم العقارات بدقة بالاعتماد على بيانات السوق المصري.
-        * **Privacy Policy:** جميع بيانات العملاء وعمليات البحث مشفرة ومحمية بالكامل وفقاً للمعايير الأمنية المعتمدة.
-        """)
+        st.markdown("📞 **Customer Support / الدعم الفني:**")
+        st.info("💬 Email: support@aqarok.com \n📞 Hotline: 19888 (24/7 Available)")
+
+        st.divider()
+        st.markdown("ℹ️ **About Us & Privacy / عن التطبيق:**")
+        st.write("Aqarok AI Platform v2.5 — Empowering Egyptian real estate investments with advanced intelligence.")
