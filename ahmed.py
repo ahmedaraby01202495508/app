@@ -46,14 +46,58 @@ if "lang" not in st.session_state:
     st.session_state.lang = "العربية"
 
 
-# 2. بيانات واقعية موسعة تشمل كل مدن السوق المصري
+# 2. بيانات المدن مع الإحداثيات الجغرافية (للخريطة) والمميزات الحقيقية
+@st.cache_data
+def load_cities_data():
+    return {
+        "التجمع الخامس": {
+            "lat": 30.0321, "lon": 31.4704,
+            "advantages_ar": "قريب من الجامعة الأمريكية، مجتمعات عمرانية حديثة، شبكة طرق رئيسية، خدمات متكاملة.",
+            "advantages_en": "Close to AUC, modern gated communities, major highway access, full amenities."
+        },
+        "الشيخ زايد": {
+            "lat": 30.0636, "lon": 30.9783,
+            "advantages_ar": "هدوء و مساحات خضراء واسعة، مولات تجارية كبرى، تخطيط عمراني منظم.",
+            "advantages_en": "Quiet environment, vast green spaces, major commercial malls, well-planned layout."
+        },
+        "العاصمة الإدارية": {
+            "lat": 30.0160, "lon": 31.7582,
+            "advantages_ar": "مستقبل الاستثمار، النهر الأخضر، الحي الحكومي، عوائد استثمارية مستقبلية عالية.",
+            "advantages_en": "Future of investment, Green River, government district, high future ROI."
+        },
+        "مصر الجديدة": {
+            "lat": 30.0898, "lon": 31.3291,
+            "advantages_ar": "عراقة المنطقة، قربها من المطار، شبكة مواصلات ومترو ممتازة، طابع معماري فريد.",
+            "advantages_en": "Historic charm, close to airport, excellent metro/transit network, unique architecture."
+        },
+        "مدينة نصر": {
+            "lat": 30.0570, "lon": 31.3404,
+            "advantages_ar": "حيوية المنطقة، كثافة تجارية عالية، سهولة الوصول لجميع أنحاء القاهرة.",
+            "advantages_en": "Vibrant area, high commercial activity, easy access to all parts of Cairo."
+        },
+        "6 أكتوبر": {
+            "lat": 29.9577, "lon": 30.9168,
+            "advantages_ar": "مدن صناعية كبرى، جامعات عريقة، مجتمعات سكنية متنوعة تناسب كافة الفئات.",
+            "advantages_en": "Major industrial zones, prominent universities, diverse housing options for all tiers."
+        },
+        "المعادي": {
+            "lat": 29.9602, "lon": 31.2569,
+            "advantages_ar": "إطلالة مميزة على النيل، طابع هادئ، أشجار كثيفة، سفارات وأجانب.",
+            "advantages_en": "Nile views, quiet atmosphere, leafy streets, popular among expats and embassies."
+        },
+        "الشروق": {
+            "lat": 30.1185, "lon": 31.6033,
+            "advantages_ar": "هدوء، أسعار مناسبة للاستثمار المتوسط، جامعات وكليات حديثة.",
+            "advantages_en": "Peaceful, affordable for mid-tier investment, modern universities."
+        }
+    }
+
+cities_info = load_cities_data()
+
+
 @st.cache_data
 def load_extended_data():
-    cities = [
-        "التجمع الخامس", "الشيخ زايد", "العاصمة الإدارية", 
-        "مصر الجديدة", "مدينة نصر", "6 أكتوبر", 
-        "المعادي", "الشروق", "الهرم", "زايد الجديدة"
-    ]
+    cities = list(cities_info.keys())
     types_ar = ["شقة فاخرة", "فيلا مستقلة", "توين هاوس", "دوبلكس", "تاون هاوس"]
     types_en = ["Luxury Apartment", "Standalone Villa", "Twin House", "Duplex", "Townhouse"]
     
@@ -129,12 +173,11 @@ if not st.session_state.logged_in:
             st.warning("Please enter your email / يرجى إدخال البريد الإلكتروني.")
 
 # ==========================================
-# 4. التطبيق الرئيسي بعد الدخول (Figma Mockup Views)
+# 4. التطبيق الرئيسي بعد الدخول (مع ترجمة كاملة لكل النصوص)
 # ==========================================
 else:
     is_ar = (st.session_state.lang == "العربية")
     
-    # القائمة السفلية أو الجانبية المبرمجة كأنها تطبيق موبايل
     if is_ar:
         nav_choice = st.sidebar.radio(
             "📱 شاشات التطبيق:",
@@ -183,7 +226,7 @@ else:
 
         st.divider()
 
-        all_cities_list = ["الكل / All"] + sorted(df_props["City"].unique().tolist())
+        all_cities_list = ["الكل / All"] + sorted(list(cities_info.keys()))
         c1, c2 = st.columns(2)
         with c1:
             sel_city = st.selectbox(lbl_city, all_cities_list)
@@ -233,28 +276,36 @@ else:
             st.warning("No properties match your criteria / لا توجد عقارات مطابقة لشروط البحث.")
 
     # ------------------------------------------
-    # SCREEN 2: CITY COMPARISON
+    # SCREEN 2: CITY COMPARISON (مع الخرائط والمميزات المطلوبة)
     # ------------------------------------------
     elif "City Comparison" in nav_choice or "مقارنة المدن" in nav_choice:
         if is_ar:
-            st.subheader("⚖️ City Comparison (مقارنة بين المدن)")
-            st.caption("قارن بين أي مدينتين من المدن الجديدة لمعرفة متوسط الأسعار ومعدل النمو.")
+            st.subheader("⚖️ City Comparison & Maps (مقارنة المدن والخرائط)")
+            st.caption("قارن بين أي مدينتين، وتعرف على المميزات، الأسعار المستقبلية، والخرائط التفاعلية.")
+            lbl_c1 = "المدينة الأولى"
+            lbl_c2 = "المدينة الثانية"
+            adv_title = "🌟 أبرز مميزات المدينة:"
+            map_title = "🗺️ خريطة الموقع الجغرافي:"
         else:
-            st.subheader("⚖️ City Comparison")
-            st.caption("Compare pricing metrics and growth forecasts between two cities.")
+            st.subheader("⚖️ City Comparison & Maps")
+            st.caption("Compare pricing metrics, advantages, and interactive maps between two cities.")
+            lbl_c1 = "First City"
+            lbl_c2 = "Second City"
+            adv_title = "🌟 City Advantages:"
+            map_title = "🗺️ Geographical Map Preview:"
 
         st.divider()
 
-        cities_available = sorted(df_props["City"].unique().tolist())
+        cities_available = sorted(list(cities_info.keys()))
         cc1, cc2 = st.columns(2)
         with cc1:
-            city_1 = st.selectbox("City 1 / المدينة الأولى", cities_available, index=0)
+            city_1 = st.selectbox(lbl_c1, cities_available, index=0)
         with cc2:
-            city_2 = st.selectbox("City 2 / المدينة الثانية", cities_available, index=1 if len(cities_available)>1 else 0)
+            city_2 = st.selectbox(lbl_c2, cities_available, index=1 if len(cities_available)>1 else 0)
 
         st.divider()
 
-        # حساب متوسطات حقيقية من الداتا
+        # حساب متوسطات حقيقية
         mean_p1 = df_props[df_props["City"] == city_1]["Current_Price"].mean() / 150
         mean_p2 = df_props[df_props["City"] == city_2]["Current_Price"].mean() / 150
         
@@ -265,37 +316,80 @@ else:
         }
         st.table(pd.DataFrame(comp_summary))
 
+        # عرض المميزات لكل مدينة
+        st.markdown(f"### {adv_title}")
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            st.info(f"**{city_1}:**\n\n" + (cities_info[city_1]["advantages_ar"] if is_ar else cities_info[city_1]["advantages_en"]))
+        with col_m2:
+            st.info(f"**{city_2}:**\n\n" + (cities_info[city_2]["advantages_ar"] if is_ar else cities_info[city_2]["advantages_en"]))
+
+        # عرض الخرائط التفاعلية لكل مدينة
+        st.markdown(f"### {map_title}")
+        map_col1, map_col2 = st.columns(2)
+        with map_col1:
+            st.text(city_1)
+            df_map1 = pd.DataFrame({'lat': [cities_info[city_1]["lat"]], 'lon': [cities_info[city_1]["lon"]]})
+            st.map(df_map1, zoom=11)
+        with map_col2:
+            st.text(city_2)
+            df_map2 = pd.DataFrame({'lat': [cities_info[city_2]["lat"]], 'lon': [cities_info[city_2]["lon"]]})
+            st.map(df_map2, zoom=11)
+
     # ------------------------------------------
-    # SCREEN 3: SETTINGS & SUPPORT (إعدادات اللغة والحساب)
+    # SCREEN 3: SETTINGS & SUPPORT (تغيير اللغة الفعلي وشامل)
     # ------------------------------------------
     elif "Settings" in nav_choice or "الإعدادات والدعم" in nav_choice:
         if is_ar:
             st.subheader("⚙️ Settings & Support (الإعدادات والدعم)")
             st.caption("تغيير اللغة، إعدادات الحساب، وخدمة العملاء.")
+            lbl_lang_change = "🌐 لغة التطبيق (App Language):"
+            lbl_acc = "👤 إعدادات الحساب (Account Settings):"
+            lbl_name = "الاسم بالكامل"
+            lbl_phone = "رقم الهاتف"
+            lbl_save = "حفظ التعديلات"
+            lbl_supp = "📞 خدمة العملاء والدعم الفني:"
+            lbl_about = "ℹ️ عن التطبيق وسياسة الخصوصية:"
         else:
             st.subheader("⚙️ Settings & Support")
             st.caption("Language settings, account profile, and technical support.")
+            lbl_lang_change = "🌐 App Language:"
+            lbl_acc = "👤 Account Settings:"
+            lbl_name = "Full Name"
+            lbl_phone = "Phone Number"
+            lbl_save = "Save Changes"
+            lbl_supp = "📞 Customer Support & Technical Help:"
+            lbl_about = "ℹ️ About Us & Privacy Policy:"
 
         st.divider()
 
-        # 🌐 خيار تغيير اللغة الفعلي المطلوب
-        st.markdown("🌐 **Language Preferences / لغة التطبيق:**")
-        new_lang = st.selectbox("Choose Language", ["العربية", "English"], index=0 if is_ar else 1)
+        # 🌐 تغيير لغة التطبيق بالكامل من الإعدادات
+        st.markdown(lbl_lang_change)
+        new_lang = st.selectbox("Choose Language / اختر اللغة", ["العربية", "English"], index=0 if is_ar else 1)
         if new_lang != st.session_state.lang:
             st.session_state.lang = new_lang
             st.rerun()
 
         st.divider()
-        st.markdown("👤 **Account Settings / تعديل الحساب:**")
-        st.text_input("Full Name", value="أحمد محمد (Aqarok Expert)")
-        st.text_input("Phone Number", value="+20 1012345678")
-        if st.button("Save Changes"):
-            st.success("Changes saved successfully!")
+        st.markdown(lbl_acc)
+        st.text_input(lbl_name, value="أحمد محمد (Aqarok Expert)")
+        st.text_input(lbl_phone, value="+20 1012345678")
+        if st.button(lbl_save):
+            st.success("Changes saved successfully! / تم حفظ التعديلات بنجاح.")
 
         st.divider()
-        st.markdown("📞 **Customer Support / الدعم الفني:**")
-        st.info("💬 Email: support@aqarok.com \n📞 Hotline: 19888 (24/7 Available)")
+        st.markdown(lbl_supp)
+        st.info("💬 Email / البريد الإلكتروني: support@aqarok.com \n📞 Hotline / الخط الساخن: 19888 (24/7 Available)")
 
         st.divider()
-        st.markdown("ℹ️ **About Us & Privacy / عن التطبيق:**")
-        st.write("Aqarok AI Platform v2.5 — Empowering Egyptian real estate investments with advanced intelligence.")
+        st.markdown(lbl_about)
+        if is_ar:
+            st.write("""
+            * **من نحن (About Us):** منصة "عقارك" هي النظام الذكي الأول لمساعدة المستثمرين والموظفين في تقييم العقارات بدقة بالاعتماد على بيانات السوق المصري.
+            * **سياسة الخصوصية (Privacy Policy):** جميع بيانات العملاء وعمليات البحث مشفرة ومحمية بالكامل وفقاً للمعايير الأمنية المعتمدة.
+            """)
+        else:
+            st.write("""
+            * **About Us:** Aqarok platform is the leading intelligent system empowering investors and professionals to accurately evaluate Egyptian real estate.
+            * **Privacy Policy:** All customer data and search operations are fully encrypted and protected according to certified security standards.
+            """)
